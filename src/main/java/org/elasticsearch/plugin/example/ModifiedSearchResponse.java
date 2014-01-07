@@ -57,7 +57,6 @@ import java.util.Map;
 import org.apache.lucene.util.CollectionUtil;
 import java.util.*;
 
-
 import static org.elasticsearch.action.search.ShardSearchFailure.readShardSearchFailure;
 
 /**
@@ -157,6 +156,8 @@ public class ModifiedSearchResponse implements ToXContent {
         ////  END SUGGEST    ///////////
         //////     HITS SECTION //////////////
 
+        }
+        builder.endArray();
 
 
        return builder;
