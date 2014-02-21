@@ -31,12 +31,21 @@ import org.elasticsearch.rest.RestStatus;
 import org.elasticsearch.search.SearchHits;
 import org.elasticsearch.search.SearchHit;
 import org.elasticsearch.search.aggregations.Aggregations;
+import org.elasticsearch.search.aggregations.InternalAggregations;
+import org.elasticsearch.search.aggregations.Aggregation;
+import org.elasticsearch.search.aggregations.InternalAggregation;
 import org.elasticsearch.search.facet.Facets;
+import org.elasticsearch.search.facet.Facet;
+import org.elasticsearch.search.facet.InternalFacets;
+import org.elasticsearch.search.facet.InternalFacet;
 import org.elasticsearch.search.suggest.Suggest;
 import org.elasticsearch.action.search.SearchResponse;
 import org.elasticsearch.search.internal.InternalSearchResponse;
 import org.elasticsearch.search.SearchHitField;
 import org.elasticsearch.common.inject.Inject;
+import org.elasticsearch.search.suggest.Suggest.Suggestion.Entry;
+import org.elasticsearch.search.suggest.Suggest.Suggestion.Entry.Option;
+import org.elasticsearch.search.suggest.Suggest.Suggestion;
 
 
 
@@ -45,6 +54,8 @@ import java.io.IOException;
 import java.lang.reflect.Field;
 import java.lang.Object;
 import java.util.Map;
+import org.apache.lucene.util.CollectionUtil;
+import java.util.*;
 
 
 import static org.elasticsearch.action.search.ShardSearchFailure.readShardSearchFailure;
@@ -67,12 +78,15 @@ public class ModifiedSearchResponse implements ToXContent {
         static final XContentBuilderString HITS = new XContentBuilderString("hits");
         static final XContentBuilderString TOTAL = new XContentBuilderString("total");
         static final XContentBuilderString MAX_SCORE = new XContentBuilderString("max_score");
+        static final XContentBuilderString FACETS = new XContentBuilderString("facets");
+        static final XContentBuilderString AGGREGATIONS = new XContentBuilderString("aggregations");
+        static final XContentBuilderString SUGGEST = new XContentBuilderString("suggest");
     }
     @Override
     public XContentBuilder toXContent(XContentBuilder builder, Params params) throws IOException {
 
         builder.field(Fields.HITS);
-
+        //HITS AS AN ARRAY
         builder.startArray();
         for (SearchHit hit : response.getHits()) {
             Map<String, SearchHitField> fields = hit.getFields();
@@ -98,8 +112,51 @@ public class ModifiedSearchResponse implements ToXContent {
             // builder.endObject();
             }
             builder.endObject();
+
+
         }
         builder.endArray();
+        //  BUILD FACETS NOW ///////
+        Facets facets = response.getFacets();
+        if (facets != null) {
+            builder.startObject(Fields.FACETS);
+            for (Facet facet : facets) {
+                ((InternalFacet) facet).toXContent(builder, params);
+            }
+            builder.endObject();
+        }   
+        ///  END FACETS  ////////
+
+        ///  BUILD AGGREGATIONS ////////
+        Aggregations aggregations = response.getAggregations();
+        if (aggregations != null) {
+            List<Aggregation> list_aggregations = aggregations.asList();
+            if (!list_aggregations.isEmpty()){
+                builder.startObject(Fields.AGGREGATIONS);
+                for (Aggregation aggregation : list_aggregations) {
+                    ((InternalAggregation) aggregation).toXContent(builder, params);
+                }
+                builder.endObject();
+            }
+        }
+        // END AGGREGATIONS ///////
+
+        ////  BUILD SUGGEST  ///////////
+        Suggest suggest = response.getSuggest();
+
+        if (suggest != null){
+            builder.startObject(Fields.SUGGEST);
+            Iterator<Suggestion<? extends Entry<? extends Option>>> suggestion_iterator = suggest.iterator();
+
+            while(suggestion_iterator.hasNext()) {
+                Suggestion<?> suggestion = suggestion_iterator.next();
+                suggestion.toXContent(builder, params);
+            }
+            builder.endObject();
+        }
+        ////  END SUGGEST    ///////////
+        //////     HITS SECTION //////////////
+
 
 
        return builder;
